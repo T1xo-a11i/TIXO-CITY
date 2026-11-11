@@ -70,6 +70,11 @@
       </section>
 
       <section class="panel wide">
+        <div class="panel-head"><div><h2>Источники информации</h2><div class="hint">Проверяемые публичные первоисточники</div></div><span class="tag" id="sourceCount">0 источников</span></div>
+        <div class="section-body"><div class="list" id="sourceList"><div class="empty">Загружаем реестр источников…</div></div></div>
+      </section>
+
+      <section class="panel wide">
         <div class="panel-head"><h2>Tixo AI</h2><span class="tag">аналитика</span></div>
         <div class="section-body">
           <div class="hint">На этом этапе AI не анализирует камеры в фоне. Когда подключим разрешённые потоки и сервер, здесь появятся проверенные наблюдения с указанием источника.</div>
@@ -105,6 +110,7 @@
   let supabase = null;
   let cameras = [];
   let events = [];
+  let sources = [];
   let activeFilter = "all";
   const cameraLayer = L.layerGroup().addTo(map);
 
@@ -160,6 +166,23 @@
     });
   }
 
+  function renderSources() {
+    $("sourceCount").textContent = `${sources.length} источника`;
+    const root = $("sourceList");
+    if (!sources.length) {
+      root.innerHTML = '<div class="empty">Реестр пока пуст. Добавим только проверенные публичные источники.</div>';
+      return;
+    }
+    root.innerHTML = sources.map(s => {
+      const url = safeHttpUrl(s.source_url);
+      const link = url ? `<a href="${safeText(url)}" target="_blank" rel="noopener noreferrer">Открыть первоисточник ↗</a>` : "Ссылка не указана";
+      const scope = s.scope === "city" ? "город" : s.scope === "regional" ? "регион" : "федеральный";
+      const mode = s.update_mode === "api_verified" ? "API проверен" : s.update_mode === "rss_candidate" ? "RSS-кандидат" : "ручная проверка";
+      const checked = s.checked_at ? new Date(s.checked_at).toLocaleDateString("ru-RU") : "дата проверки не указана";
+      return `<div class="item"><div class="item-top"><span class="item-title">${safeText(s.name)}</span><span class="tag">${scope}</span></div><div class="hint">${safeText(s.source_type || "источник")} · ${mode} · проверено: ${safeText(checked)}</div><div class="hint">${safeText(s.notes || "")}</div><div class="hint">${link}</div></div>`;
+    }).join("");
+  }
+
   function renderEvents() {
     $("eventCount").textContent = events.length;
     const filtered = activeFilter === "important"
@@ -181,20 +204,24 @@
 
   async function loadData() {
     if (!supabase) {
-      $("dataStatus").textContent = "Демо-режим: добавь URL и anon key отдельного Supabase-проекта в начале скрипта.";
-      renderCameras(); renderEvents(); return;
+      $("dataStatus").textContent = "Демо-режим: Supabase не настроен.";
+      renderCameras(); renderEvents(); renderSources(); return;
     }
     $("dataStatus").textContent = "Загружаем данные…";
     try {
-      const [camRes, eventRes] = await Promise.all([
+      const [camRes, eventRes, sourceRes] = await Promise.all([
         supabase.from("cameras").select("id,name,address,latitude,longitude,source_url,status,is_public").eq("is_public", true),
-        supabase.from("city_events").select("id,title,description,category,importance,source_url,occurred_at").eq("is_public", true).order("occurred_at", {ascending:false, nullsFirst:false}).limit(50)
+        supabase.from("city_events").select("id,title,description,category,importance,source_url,occurred_at").eq("is_public", true).order("occurred_at", {ascending:false, nullsFirst:false}).limit(50),
+        supabase.from("city_sources").select("id,name,scope,source_type,source_url,update_mode,notes,checked_at").eq("is_active", true).order("scope", {ascending:true})
       ]);
       if (camRes.error) throw new Error("Камеры: " + camRes.error.message);
       if (eventRes.error) throw new Error("События: " + eventRes.error.message);
       cameras = camRes.data || []; events = eventRes.data || [];
-      renderCameras(); renderEvents();
-      $("dataStatus").textContent = `Обновлено: ${new Date().toLocaleTimeString("ru-RU")}`;
+      sources = sourceRes.error ? [] : (sourceRes.data || []);
+      renderCameras(); renderEvents(); renderSources();
+      $("dataStatus").textContent = sourceRes.error
+        ? `Камеры и события обновлены; реестр источников недоступен: ${sourceRes.error.message}`
+        : `Обновлено: ${new Date().toLocaleTimeString("ru-RU")}`;
     } catch (err) {
       console.error(err);
       $("dataStatus").textContent = "Не удалось загрузить данные: " + err.message;
