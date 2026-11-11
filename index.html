@@ -90,8 +90,8 @@
 
   // Заполни эти значения после создания отдельного проекта Supabase.
   // Используй только публичный ключ. Привилегированный серверный ключ нельзя помещать в браузер.
-  const SUPABASE_URL = "";
-  const SUPABASE_ANON_KEY = "";
+  const SUPABASE_URL = "https://wvogbagrphcslcbsntaq.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_-gMUs3OV9aeYV_LiXf7rZw_BrD4Wufr";
 
   const KISELYOVSK = [54.006, 86.636];
   const $ = (id) => document.getElementById(id);
@@ -188,7 +188,7 @@
     try {
       const [camRes, eventRes] = await Promise.all([
         supabase.from("cameras").select("id,name,address,latitude,longitude,source_url,status,is_public").eq("is_public", true),
-        supabase.from("city_events").select("id,title,description,category,importance,source_url,occurred_at").order("occurred_at", {ascending:false}).limit(50)
+        supabase.from("city_events").select("id,title,description,category,importance,source_url,occurred_at").eq("is_public", true).order("occurred_at", {ascending:false, nullsFirst:false}).limit(50)
       ]);
       if (camRes.error) throw new Error("Камеры: " + camRes.error.message);
       if (eventRes.error) throw new Error("События: " + eventRes.error.message);
