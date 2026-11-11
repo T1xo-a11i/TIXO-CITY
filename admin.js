@@ -22,7 +22,7 @@
     if (admin) {
       $("adminState").className = "tag good";
       status("Вход выполнен. Новые события сохраняются черновиками.");
-      await loadEvents();
+      await Promise.all([loadEvents(), loadCameras()]);
     } else {
       $("adminState").className = "tag";
       if (user) status("У аккаунта нет роли admin в Supabase app_metadata.");
@@ -91,6 +91,91 @@
       root.appendChild(card);
     });
   }
+
+  async function loadCameras() {
+    if (!admin) return;
+    const root = $("adminCameraList");
+    root.replaceChildren();
+    const { data, error } = await db.from("cameras")
+      .select("id,name,address,source_url,status,is_public,latitude,longitude")
+      .order("created_at", { ascending: false }).limit(100);
+    if (error) { addText(root, "div", "Не удалось загрузить камеры: " + error.message, "empty"); return; }
+    if (!data || !data.length) { addText(root, "div", "Каталог камер пока пуст.", "empty"); return; }
+    data.forEach(camera => {
+      const card = document.createElement("div");
+      card.className = "item";
+      const top = document.createElement("div");
+      top.className = "item-top";
+      addText(top, "strong", camera.name, "item-title");
+      addText(top, "span", camera.is_public ? "публично" : "скрыто", camera.is_public ? "tag good" : "tag warn");
+      card.appendChild(top);
+      addText(card, "div", (camera.status || "unknown") + " · " + (camera.address || "адрес не указан"), "hint");
+      const link = document.createElement("a");
+      link.href = camera.source_url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Открыть источник ↗";
+      card.appendChild(link);
+      const controls = document.createElement("div");
+      controls.className = "admin-actions";
+      const statusSelect = document.createElement("select");
+      statusSelect.className = "btn";
+      ["unknown", "online", "offline"].forEach(value => {
+        const option = document.createElement("option");
+        option.value = value; option.textContent = value; option.selected = camera.status === value;
+        statusSelect.appendChild(option);
+      });
+      const save = document.createElement("button");
+      save.type = "button"; save.className = "btn"; save.textContent = "Сохранить статус";
+      save.addEventListener("click", async () => {
+        save.disabled = true;
+        const { error: updateError } = await db.from("cameras").update({ status: statusSelect.value }).eq("id", camera.id);
+        status(updateError ? "Ошибка статуса: " + updateError.message : "Статус камеры обновлён.");
+        save.disabled = false;
+        if (!updateError) await loadCameras();
+      });
+      const publish = document.createElement("button");
+      publish.type = "button"; publish.className = "btn";
+      publish.textContent = camera.is_public ? "Скрыть" : "Опубликовать";
+      publish.addEventListener("click", async () => {
+        publish.disabled = true;
+        const { error: updateError } = await db.from("cameras").update({ is_public: !camera.is_public }).eq("id", camera.id);
+        status(updateError ? "Ошибка публикации: " + updateError.message : "Публичность камеры изменена.");
+        if (!updateError) { await loadCameras(); } else publish.disabled = false;
+      });
+      controls.append(statusSelect, save, publish);
+      card.appendChild(controls);
+      root.appendChild(card);
+    });
+  }
+
+  $("cameraForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!admin) { status("Сначала войди как администратор."); return; }
+    let source;
+    try { source = new URL($("cameraSource").value.trim()); }
+    catch (_) { status("Укажи корректную ссылку источника."); return; }
+    if (source.protocol !== "https:") { status("Разрешены только HTTPS-ссылки."); return; }
+    const latText = $("cameraLat").value.trim(), lonText = $("cameraLon").value.trim();
+    if (!!latText !== !!lonText) { status("Для точки на карте нужны обе координаты."); return; }
+    const payload = {
+      name: $("cameraName").value.trim(),
+      address: $("cameraAddress").value.trim() || null,
+      source_url: source.href,
+      latitude: latText ? Number(latText) : null,
+      longitude: lonText ? Number(lonText) : null,
+      status: $("cameraStatus").value,
+      is_public: $("cameraPublic").checked
+    };
+    if (!payload.name || (latText && (!Number.isFinite(payload.latitude) || Math.abs(payload.latitude)>90 || !Number.isFinite(payload.longitude) || Math.abs(payload.longitude)>180))) {
+      status("Проверь название и координаты."); return;
+    }
+    const { error } = await db.from("cameras").insert(payload);
+    if (error) { status("Не удалось добавить камеру: " + error.message); return; }
+    $("cameraForm").reset();
+    status("Камера добавлена.");
+    await loadCameras();
+  });
 
   $("adminLoginForm").addEventListener("submit", async event => {
     event.preventDefault();
