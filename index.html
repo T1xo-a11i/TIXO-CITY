@@ -27,6 +27,7 @@
     .list{display:grid;gap:9px}.item{padding:11px;border:1px solid var(--line);border-radius:13px;background:#0e1728}.item-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.item-title{font-weight:650}.tag{font-size:10px;padding:3px 7px;border-radius:999px;background:#26354d;color:#b8c9e5;white-space:nowrap}.tag.good{color:var(--green);background:#15382f}.tag.warn{color:var(--amber);background:#3b2d19}.empty{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:13px;font-size:13px}
     .tabs{display:flex;gap:7px;flex-wrap:wrap}.tab{padding:7px 10px;border-radius:9px;border:1px solid var(--line);color:var(--muted);background:transparent}.tab.active{background:#213656;color:var(--text);border-color:#456a9e}
     .footer{margin:16px 2px 4px;color:var(--muted);font-size:11px}.gpsline{font-size:12px;color:var(--muted);margin-top:9px;min-height:18px}
+    .camera-viewer{position:fixed;inset:0;z-index:2000;background:#050914ee;display:none;align-items:center;justify-content:center;padding:14px}.camera-viewer.open{display:flex}.viewer-box{width:min(1100px,100%);height:min(760px,92dvh);background:#101a2c;border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 70px #0009}.viewer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px;border-bottom:1px solid var(--line)}.viewer-frame{flex:1;width:100%;border:0;background:#080d17}.viewer-note{padding:10px 14px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}.viewer-actions{display:flex;gap:8px;flex-wrap:wrap}
     .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#111a2b;color:#edf3ff}.leaflet-popup-content{margin:10px 13px}
     .admin-form{display:grid;gap:9px}.admin-form input,.admin-form textarea,.admin-form select{width:100%;border:1px solid var(--line);border-radius:10px;background:#0b1424;color:var(--text);padding:10px}.admin-form textarea{min-height:76px;resize:vertical}.admin-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.admin-actions{display:flex;gap:8px;flex-wrap:wrap}.admin-note{font-size:12px;color:var(--muted);min-height:18px}
     @media(max-width:900px){.layout{grid-template-columns:1fr}#map{height:430px}.side{grid-template-columns:1fr 1fr}.side .wide{grid-column:1/-1}}
@@ -120,6 +121,10 @@
       </section>
     </aside>
   </main>
+  <section class="camera-viewer" id="cameraViewer" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+    <div class="viewer-box"><div class="viewer-head"><div><h2 id="viewerTitle">Просмотр камеры</h2><div class="hint" id="viewerSubtitle">Официальный источник</div></div><div class="viewer-actions"><a class="btn" id="viewerExternal" href="#" target="_blank" rel="noopener noreferrer">Открыть отдельно ↗</a><button class="btn" id="viewerClose" type="button">Закрыть</button></div></div><iframe class="viewer-frame" id="cameraFrame" title="Официальная страница просмотра камеры" referrerpolicy="no-referrer" sandbox="allow-scripts allow-forms allow-popups"></iframe><div class="viewer-note" id="viewerNote">Если просмотр не загрузился, сайт может запрещать встраивание. Открой официальный источник отдельно.</div></div>
+  </section>
+
   <div class="footer">TIXO CITY · Прототип. Не является экстренной службой. При опасности обращайся в официальные службы. Геопозиция не сохраняется и не отправляется.</div>
 </div>
 
@@ -178,6 +183,46 @@
       Math.abs(Number(lat)) <= 90 && Math.abs(Number(lon)) <= 180;
   }
 
+  function openCameraViewer(camera) {
+    const source = safeHttpUrl(camera.source_url);
+    if (!source) return;
+    let url;
+    try { url = new URL(source); } catch (_) { return; }
+    const trustedA42 = url.hostname === "pdd.a42.ru" && url.pathname.startsWith("/camera");
+    const trustedGoodline = url.hostname === "www.goodline.ru" && url.pathname.startsWith("/goodline-gorod");
+    if (!trustedA42 && !trustedGoodline) {
+      window.open(source, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const viewer = $("cameraViewer");
+    $("viewerTitle").textContent = camera.name || "Просмотр камеры";
+    $("viewerSubtitle").textContent = camera.address || "Официальный источник";
+    $("viewerExternal").href = source;
+    const frame = $("cameraFrame");
+    if (trustedGoodline) {
+      frame.removeAttribute("src");
+      $("viewerNote").textContent = "Goodline указывает, что городские камеры доступны в мобильном приложении Goodline Город. Веб-встраивание не подтверждено — открой официальный источник или приложение.";
+    } else {
+      frame.src = source;
+      $("viewerNote").textContent = "Пробуем открыть официальный каталог A42 внутри TIXO CITY. Если область пустая или сайт сообщает об отказе, нажми «Открыть отдельно». TIXO не копирует и не проксирует видеопоток.";
+    }
+    viewer.classList.add("open");
+    $("viewerClose").focus();
+  }
+
+  function closeCameraViewer() {
+    $("cameraViewer").classList.remove("open");
+    $("cameraFrame").removeAttribute("src");
+  }
+
+  $("viewerClose").addEventListener("click", closeCameraViewer);
+  $("cameraViewer").addEventListener("click", event => {
+    if (event.target === $("cameraViewer")) closeCameraViewer();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeCameraViewer();
+  });
+
   function renderCameras() {
     $("cameraCount").textContent = cameras.length;
     $("onlineCount").textContent = cameras.filter(c => c.status === "online").length;
@@ -192,14 +237,20 @@
       const status = c.status === "online" ? "good" : "warn";
       const source = safeHttpUrl(c.source_url);
       const isGoodline = /goodline|a42/i.test(String(c.name || "")) && source;
-      const link = source ? `<a href="${safeText(source)}" target="_blank" rel="noopener noreferrer">Открыть каталог камер A42 ↗</a>` : "Источник не указан";
+      const link = source ? `<button class="btn camera-open" type="button" data-camera-id="${safeText(c.id)}">Открыть просмотр</button> <a href="${safeText(source)}" target="_blank" rel="noopener noreferrer">Источник отдельно ↗</a>` : "Источник не указан";
       const appLink = isGoodline ? ' · <a href="https://www.goodline.ru/goodline-gorod" target="_blank" rel="noopener noreferrer">Goodline Город ↗</a>' : "";
       const label = isGoodline ? "просмотр в приложении" : (c.status || "unknown");
       const detail = isGoodline
         ? '<div class="hint">Киселёвск указан среди городов с дорожными камерами. Просмотр доступен через Goodline Город; открытый видеопоток для встраивания на сайт не опубликован.</div>'
-        : "";
+        : '<div class="hint">Встроенный просмотр может быть запрещён самим сайтом. Если не откроется — используй ссылку на официальный источник.</div>';
       return `<div class="item"><div class="item-top"><span class="item-title">${safeText(c.name)}</span><span class="tag ${status}">${safeText(label)}</span></div><div class="hint">${safeText(c.address || "Адрес не указан")} · ${link}${appLink}</div>${detail}</div>`;
     }).join("");
+    root.querySelectorAll(".camera-open").forEach(button => {
+      button.addEventListener("click", () => {
+        const camera = cameras.find(item => String(item.id) === button.dataset.cameraId);
+        if (camera) openCameraViewer(camera);
+      });
+    });
     cameras.forEach(c => {
       if (validCoords(c.latitude, c.longitude)) {
         L.marker([Number(c.latitude), Number(c.longitude)]).addTo(cameraLayer)
