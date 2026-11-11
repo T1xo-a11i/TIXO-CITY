@@ -88,6 +88,18 @@
               <div class="admin-actions"><button class="btn primary" type="submit">Сохранить черновик</button><button class="btn" id="adminLogout" type="button">Выйти</button></div>
             </form>
             <div class="admin-note">Новые записи создаются скрытыми. Публикуй только после проверки первоисточника.</div>
+            <hr style="border:0;border-top:1px solid var(--line);width:100%;margin:8px 0">
+            <h3 style="font-size:14px;margin:0">Управление камерами</h3>
+            <form id="cameraForm" class="admin-form">
+              <input id="cameraName" maxlength="160" placeholder="Название камеры или каталога" required>
+              <input id="cameraAddress" maxlength="240" placeholder="Адрес / район (необязательно)">
+              <input id="cameraSource" type="url" placeholder="HTTPS-ссылка на официальный источник" required>
+              <div class="admin-row"><input id="cameraLat" type="number" min="-90" max="90" step="any" placeholder="Широта (необязательно)"><input id="cameraLon" type="number" min="-180" max="180" step="any" placeholder="Долгота (необязательно)"></div>
+              <div class="admin-row"><select id="cameraStatus"><option value="unknown">Не проверено</option><option value="online">Онлайн (проверено вручную)</option><option value="offline">Офлайн (проверено вручную)</option></select><label class="hint"><input id="cameraPublic" type="checkbox" style="width:auto"> Показывать публично</label></div>
+              <button class="btn primary" type="submit">Добавить камеру / каталог</button>
+            </form>
+            <div class="admin-note">Новая запись по умолчанию не публикуется. «Онлайн» ставь только после реальной проверки; каталог ссылок не считается видеопотоком.</div>
+            <div id="adminCameraList" class="list" style="margin-top:12px"></div>
             <div id="adminEventList" class="list" style="margin-top:12px"></div>
           </div>
         </div>
