@@ -122,7 +122,7 @@
     </aside>
   </main>
   <section class="camera-viewer" id="cameraViewer" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
-    <div class="viewer-box"><div class="viewer-head"><div><h2 id="viewerTitle">Просмотр камеры</h2><div class="hint" id="viewerSubtitle">Официальный источник</div></div><div class="viewer-actions"><a class="btn" id="viewerExternal" href="#" target="_blank" rel="noopener noreferrer">Открыть отдельно ↗</a><button class="btn" id="viewerClose" type="button">Закрыть</button></div></div><iframe class="viewer-frame" id="cameraFrame" title="Официальная страница просмотра камеры" referrerpolicy="no-referrer" sandbox="allow-scripts allow-forms allow-popups"></iframe><div class="viewer-note" id="viewerNote">Если просмотр не загрузился, сайт может запрещать встраивание. Открой официальный источник отдельно.</div></div>
+    <div class="viewer-box"><div class="viewer-head"><div><h2 id="viewerTitle">Просмотр камеры</h2><div class="hint" id="viewerSubtitle">Официальный источник</div></div><div class="viewer-actions"><a class="btn" id="viewerExternal" href="#" target="_blank" rel="noopener noreferrer">Открыть отдельно ↗</a><button class="btn" id="viewerClose" type="button">Закрыть</button></div></div><iframe class="viewer-frame" id="cameraFrame" title="Официальная страница просмотра камеры" referrerpolicy="no-referrer" allow="autoplay; fullscreen; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"></iframe><div class="viewer-note" id="viewerNote">Если просмотр не загрузился, сайт может запрещать встраивание. Открой официальный источник отдельно.</div></div>
   </section>
 
   <div class="footer">TIXO CITY · Прототип. Не является экстренной службой. При опасности обращайся в официальные службы. Геопозиция не сохраняется и не отправляется.</div>
@@ -174,7 +174,7 @@
   function safeHttpUrl(value) {
     try {
       const url = new URL(String(value || ""));
-      return (url.protocol === "https:" || url.protocol === "http:") ? url.href : "";
+      return url.protocol === "https:" ? url.href : "";
     } catch (_) { return ""; }
   }
 
@@ -182,6 +182,8 @@
     return Number.isFinite(Number(lat)) && Number.isFinite(Number(lon)) &&
       Math.abs(Number(lat)) <= 90 && Math.abs(Number(lon)) <= 180;
   }
+
+  let viewerLoadTimer = null;
 
   function openCameraViewer(camera) {
     const source = safeHttpUrl(camera.source_url);
@@ -199,18 +201,24 @@
     $("viewerSubtitle").textContent = camera.address || "Официальный источник";
     $("viewerExternal").href = source;
     const frame = $("cameraFrame");
+    if (viewerLoadTimer) window.clearTimeout(viewerLoadTimer);
     if (trustedGoodline) {
       frame.removeAttribute("src");
       $("viewerNote").textContent = "Goodline указывает, что городские камеры доступны в мобильном приложении Goodline Город. Веб-встраивание не подтверждено — открой официальный источник или приложение.";
     } else {
+      $("viewerNote").textContent = "Загружаем официальный каталог A42. Это страница источника, а не отдельный видеопоток. Если просмотр не появится, открой сайт отдельно. TIXO не копирует и не проксирует видео.";
+      viewerLoadTimer = window.setTimeout(() => {
+        $("viewerNote").textContent = "Каталог долго не отвечает или запрещает встраивание. Открой официальный источник отдельно.";
+      }, 10000);
       frame.src = source;
-      $("viewerNote").textContent = "Пробуем открыть официальный каталог A42 внутри TIXO CITY. Если область пустая или сайт сообщает об отказе, нажми «Открыть отдельно». TIXO не копирует и не проксирует видеопоток.";
     }
     viewer.classList.add("open");
     $("viewerClose").focus();
   }
 
   function closeCameraViewer() {
+    if (viewerLoadTimer) window.clearTimeout(viewerLoadTimer);
+    viewerLoadTimer = null;
     $("cameraViewer").classList.remove("open");
     $("cameraFrame").removeAttribute("src");
   }
