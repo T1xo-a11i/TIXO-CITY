@@ -202,13 +202,19 @@
     $("viewerExternal").href = source;
     const frame = $("cameraFrame");
     if (viewerLoadTimer) window.clearTimeout(viewerLoadTimer);
+    frame.onload = null;
     if (trustedGoodline) {
       frame.removeAttribute("src");
       $("viewerNote").textContent = "Goodline указывает, что городские камеры доступны в мобильном приложении Goodline Город. Веб-встраивание не подтверждено — открой официальный источник или приложение.";
     } else {
       $("viewerNote").textContent = "Загружаем официальный каталог A42. Это страница источника, а не отдельный видеопоток. Если просмотр не появится, открой сайт отдельно. TIXO не копирует и не проксирует видео.";
+      frame.onload = () => {
+        if (viewerLoadTimer) window.clearTimeout(viewerLoadTimer);
+        viewerLoadTimer = null;
+        $("viewerNote").textContent = "Страница A42 ответила. Если внутри пусто или сайт показывает отказ, открой официальный источник отдельно.";
+      };
       viewerLoadTimer = window.setTimeout(() => {
-        $("viewerNote").textContent = "Каталог долго не отвечает или запрещает встраивание. Открой официальный источник отдельно.";
+        $("viewerNote").textContent = "Каталог долго не отвечает. Открой официальный источник отдельно.";
       }, 10000);
       frame.src = source;
     }
