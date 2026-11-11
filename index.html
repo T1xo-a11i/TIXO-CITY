@@ -244,13 +244,17 @@
     root.innerHTML = cameras.map(c => {
       const status = c.status === "online" ? "good" : "warn";
       const source = safeHttpUrl(c.source_url);
-      const isGoodline = /goodline|a42/i.test(String(c.name || "")) && source;
+      const sourceHost = source ? new URL(source).hostname : "";
+      const isGoodline = sourceHost === "www.goodline.ru";
+      const isA42 = sourceHost === "pdd.a42.ru";
       const link = source ? `<button class="btn camera-open" type="button" data-camera-id="${safeText(c.id)}">Открыть просмотр</button> <a href="${safeText(source)}" target="_blank" rel="noopener noreferrer">Источник отдельно ↗</a>` : "Источник не указан";
       const appLink = isGoodline ? ' · <a href="https://www.goodline.ru/goodline-gorod" target="_blank" rel="noopener noreferrer">Goodline Город ↗</a>' : "";
       const label = isGoodline ? "просмотр в приложении" : (c.status || "unknown");
       const detail = isGoodline
-        ? '<div class="hint">Киселёвск указан среди городов с дорожными камерами. Просмотр доступен через Goodline Город; открытый видеопоток для встраивания на сайт не опубликован.</div>'
-        : '<div class="hint">Встроенный просмотр может быть запрещён самим сайтом. Если не откроется — используй ссылку на официальный источник.</div>';
+        ? '<div class="hint">Goodline указывает, что городские камеры доступны в мобильном приложении. Открытый веб-поток для встраивания не подтверждён.</div>'
+        : isA42
+          ? '<div class="hint">Официальный каталог A42. Если встроенная страница не покажет камеры или будет недоступна, открой источник отдельно.</div>'
+          : '<div class="hint">Встроенный просмотр может быть запрещён самим сайтом. Если не откроется — используй ссылку на официальный источник.</div>';
       return `<div class="item"><div class="item-top"><span class="item-title">${safeText(c.name)}</span><span class="tag ${status}">${safeText(label)}</span></div><div class="hint">${safeText(c.address || "Адрес не указан")} · ${link}${appLink}</div>${detail}</div>`;
     }).join("");
     root.querySelectorAll(".camera-open").forEach(button => {
