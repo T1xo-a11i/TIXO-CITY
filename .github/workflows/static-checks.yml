@@ -1,0 +1,71 @@
+name: Static checks
+
+on:
+  push:
+    branches:
+      - main
+      - feat/admin-event-panel
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check admin.js
+          node <<'NODE'
+          const fs = require('node:fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const inlineScripts = [...html.matchAll(/<script\\b(?![^>]*\\bsrc\\s*=)[^>]*>([\\s\\S]*?)<\\/script>/gi)]
+            .map(match => match[1])
+            .filter(source => source.trim());
+
+          if (inlineScripts.length === 0) {
+            throw new Error('No inline JavaScript found in index.html');
+          }
+          inlineScripts.forEach((source, index) => {
+            new Function(source);
+            console.log('index.html inline script ' + (index + 1) + ': syntax OK');
+          });
+
+          const ids = [...html.matchAll(/\\bid=["']([^"']+)["']/g)].map(match => match[1]);
+          const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
+          if (duplicates.length) {
+            throw new Error('Duplicate HTML ids: ' + [...new Set(duplicates)].join(', '));
+          }
+
+          if (!/<script\\b[^>]*src=["']admin\\.js["'][^>]*><\\/script>/i.test(html)) {
+            throw new Error('admin.js is not included by index.html');
+          }
+          NODE
+
+      - name: Check SQL migration source
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const sql = fs.readFileSync('supabase/schema.sql', 'utf8');
+          if (sql.includes('\\\\n')) {
+            throw new Error('schema.sql contains literal \\n sequences instead of line breaks');
+          }
+          if (!/create or replace function[\\s\\S]*?as \\$\\$[\\s\\S]*?\\$\\$;/i.test(sql)) {
+            throw new Error('Updated-at trigger function block is malformed');
+          }
+          if (!/with check[\\s\\S]*?admin/i.test(sql)) {
+            throw new Error('Admin write policies must include WITH CHECK');
+          }
+          console.log('SQL migration structure: OK');
+          NODE
