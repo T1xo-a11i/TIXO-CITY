@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>TIXO CITY — городской ситуационный центр</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://{s}.tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root{color-scheme:dark;--bg:#090e1b;--panel:#111a2b;--panel2:#172238;--line:#26344d;--text:#edf3ff;--muted:#91a0b8;--blue:#6ea8ff;--green:#5bd6a2;--amber:#ffca70;--red:#ff7777}
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(ellipse at 15% 0%,#14213b 0,transparent 40%),var(--bg);color:var(--text);font:15px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+    button,input{font:inherit} button{cursor:pointer}.app{max-width:1440px;margin:auto;padding:18px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#6ea8ff,#7a6bff);display:grid;place-items:center;font-weight:900;color:#08101e;letter-spacing:-1px}
+    h1{font-size:20px;margin:0;letter-spacing:.08em} .sub{font-size:12px;color:var(--muted)}
+    .status{border:1px solid var(--line);background:#10192a;border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}
+    .layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr);gap:16px}
+    .panel{background:linear-gradient(180deg,rgba(20,31,51,.96),rgba(14,22,38,.96));border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 34px #0003}
+    .panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:15px 17px;border-bottom:1px solid var(--line)}
+    h2{font-size:15px;margin:0}.hint{font-size:12px;color:var(--muted)} #map{height:540px;background:#10192a}
+    .map-tools{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:9px 12px;border-radius:11px}
+    .btn:hover{border-color:#5575a6}.btn.primary{background:#315e9e;border-color:#477fc9}.btn:disabled{opacity:.5;cursor:not-allowed}
+    .side{display:grid;gap:16px;align-content:start}.section-body{padding:14px 16px}
+    .metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.metric{background:#0d1627;border:1px solid var(--line);border-radius:13px;padding:11px}.metric strong{display:block;font-size:20px}.metric span{font-size:11px;color:var(--muted)}
+    .list{display:grid;gap:9px}.item{padding:11px;border:1px solid var(--line);border-radius:13px;background:#0e1728}.item-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.item-title{font-weight:650}.tag{font-size:10px;padding:3px 7px;border-radius:999px;background:#26354d;color:#b8c9e5;white-space:nowrap}.tag.good{color:var(--green);background:#15382f}.tag.warn{color:var(--amber);background:#3b2d19}.empty{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:13px;font-size:13px}
+    .tabs{display:flex;gap:7px;flex-wrap:wrap}.tab{padding:7px 10px;border-radius:9px;border:1px solid var(--line);color:var(--muted);background:transparent}.tab.active{background:#213656;color:var(--text);border-color:#456a9e}
+    .footer{margin:16px 2px 4px;color:var(--muted);font-size:11px}.gpsline{font-size:12px;color:var(--muted);margin-top:9px;min-height:18px}
+    .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#111a2b;color:#edf3ff}.leaflet-popup-content{margin:10px 13px}
+    @media(max-width:900px){.layout{grid-template-columns:1fr}#map{height:430px}.side{grid-template-columns:1fr 1fr}.side .wide{grid-column:1/-1}}
+    @media(max-width:580px){.app{padding:11px}header{align-items:flex-start}.status{max-width:125px;text-align:center}.side{grid-template-columns:1fr}#map{height:390px}.metric-grid{grid-template-columns:repeat(3,1fr)}.panel-head{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="logo">TX</div><div><h1>TIXO CITY</h1><div class="sub">Городской ситуационный центр · Киселёвск</div></div></div>
+    <div class="status" id="connectionStatus">● Демо-режим · база не подключена</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Карта города</h2><div class="hint">Карта и GPS работают отдельно от каталога камер</div></div>
+        <div class="map-tools"><button class="btn primary" id="gpsBtn">◎ Моё местоположение</button><button class="btn" id="resetBtn">Сбросить вид</button></div>
+      </div>
+      <div id="map" role="application" aria-label="Карта Киселёвска"></div>
+      <div class="section-body"><div class="gpsline" id="gpsStatus">GPS выключен. Нажми кнопку, чтобы запросить разрешение браузера.</div></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="panel-head"><h2>Сводка</h2><span class="tag">MVP</span></div>
+        <div class="section-body"><div class="metric-grid">
+          <div class="metric"><strong id="cameraCount">0</strong><span>камер в базе</span></div>
+          <div class="metric"><strong id="eventCount">0</strong><span>событий</span></div>
+          <div class="metric"><strong id="onlineCount">0</strong><span>онлайн</span></div>
+        </div></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-head"><div><h2>Публичные камеры</h2><div class="hint">Показываются только проверенные публичные источники</div></div><span class="tag warn" id="cameraState">источники не добавлены</span></div>
+        <div class="section-body"><div class="list" id="cameraList"><div class="empty">Пока нет подтверждённых ссылок на камеры. Не добавляем выдуманные трансляции.</div></div></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-head"><h2>Городские события</h2><div class="tabs"><button class="tab active" data-filter="all">Все</button><button class="tab" data-filter="important">Важные</button></div></div>
+        <div class="section-body"><div class="list" id="eventList"><div class="empty">Нет подтверждённых событий. Здесь будут время, источник и уровень важности.</div></div></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-head"><h2>Tixo AI</h2><span class="tag">аналитика</span></div>
+        <div class="section-body">
+          <div class="hint">На этом этапе AI не анализирует камеры в фоне. Когда подключим разрешённые потоки и сервер, здесь появятся проверенные наблюдения с указанием источника.</div>
+          <div style="height:10px"></div><button class="btn" id="refreshBtn">↻ Обновить данные</button>
+          <div class="gpsline" id="dataStatus">Используются демонстрационные пустые данные.</div>
+        </div>
+      </section>
+    </aside>
+  </main>
+  <div class="footer">TIXO CITY · Прототип. Не является экстренной службой. При опасности обращайся в официальные службы. Геопозиция не сохраняется и не отправляется.</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+  "use strict";
+
+  // Заполни эти значения после создания отдельного проекта Supabase.
+  // Используй только публичный ключ. Привилегированный серверный ключ нельзя помещать в браузер.
+  const SUPABASE_URL = "";
+  const SUPABASE_ANON_KEY = "";
+
+  const KISELYOVSK = [54.006, 86.636];
+  const $ = (id) => document.getElementById(id);
+  const map = L.map("map", { zoomControl: true }).setView(KISELYOVSK, 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+  }).addTo(map);
+
+  let userMarker = null;
+  let userCircle = null;
+  let supabase = null;
+  let cameras = [];
+  let events = [];
+  let activeFilter = "all";
+  const cameraLayer = L.layerGroup().addTo(map);
+
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      $("connectionStatus").textContent = "● Supabase настроен";
+    } catch (e) {
+      console.error("Supabase init error:", e);
+      $("connectionStatus").textContent = "● Ошибка подключения";
+    }
+  }
+
+  function safeText(value) {
+    return String(value ?? "").replace(/[&<>"']/g, ch => ({
+      "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+    })[ch]);
+  }
+
+  function safeHttpUrl(value) {
+    try {
+      const url = new URL(String(value || ""));
+      return (url.protocol === "https:" || url.protocol === "http:") ? url.href : "";
+    } catch (_) { return ""; }
+  }
+
+  function validCoords(lat, lon) {
+    return Number.isFinite(Number(lat)) && Number.isFinite(Number(lon)) &&
+      Math.abs(Number(lat)) <= 90 && Math.abs(Number(lon)) <= 180;
+  }
+
+  function renderCameras() {
+    $("cameraCount").textContent = cameras.length;
+    $("onlineCount").textContent = cameras.filter(c => c.status === "online").length;
+    $("cameraState").textContent = cameras.length ? "каталог загружен" : "источники не добавлены";
+    const root = $("cameraList");
+    cameraLayer.clearLayers();
+    if (!cameras.length) {
+      root.innerHTML = '<div class="empty">Пока нет подтверждённых ссылок на камеры. Не добавляем выдуманные трансляции.</div>';
+      return;
+    }
+    root.innerHTML = cameras.map(c => {
+      const status = c.status === "online" ? "good" : "warn";
+      const source = safeHttpUrl(c.source_url);
+      const link = source ? `<a href="${safeText(source)}" target="_blank" rel="noopener noreferrer">Источник ↗</a>` : "Источник не указан";
+      return `<div class="item"><div class="item-top"><span class="item-title">${safeText(c.name)}</span><span class="tag ${status}">${safeText(c.status || "unknown")}</span></div><div class="hint">${safeText(c.address || "Адрес не указан")} · ${link}</div></div>`;
+    }).join("");
+    cameras.forEach(c => {
+      if (validCoords(c.latitude, c.longitude)) {
+        L.marker([Number(c.latitude), Number(c.longitude)]).addTo(cameraLayer)
+          .bindPopup(`<b>${safeText(c.name)}</b><br>${safeText(c.address || "")}`);
+      }
+    });
+  }
+
+  function renderEvents() {
+    $("eventCount").textContent = events.length;
+    const filtered = activeFilter === "important"
+      ? events.filter(e => e.importance === "important" || e.importance === "critical") : events;
+    const root = $("eventList");
+    if (!filtered.length) {
+      root.innerHTML = '<div class="empty">Нет подтверждённых событий для выбранного фильтра.</div>';
+      return;
+    }
+    root.innerHTML = filtered.map(e => {
+      const level = e.importance === "critical" ? "critical" : e.importance === "important" ? "важное" : "обычное";
+      const cls = e.importance === "critical" || e.importance === "important" ? "warn" : "";
+      const when = e.occurred_at ? new Date(e.occurred_at).toLocaleString("ru-RU") : "Время неизвестно";
+      const sourceUrl = safeHttpUrl(e.source_url);
+      const source = sourceUrl ? `<a href="${safeText(sourceUrl)}" target="_blank" rel="noopener noreferrer">Источник ↗</a>` : "Источник не указан";
+      return `<div class="item"><div class="item-top"><span class="item-title">${safeText(e.title)}</span><span class="tag ${cls}">${level}</span></div><div class="hint">${safeText(e.category || "прочее")} · ${safeText(when)}</div><div class="hint">${safeText(e.description || "")} ${source}</div></div>`;
+    }).join("");
+  }
+
+  async function loadData() {
+    if (!supabase) {
+      $("dataStatus").textContent = "Демо-режим: добавь URL и anon key отдельного Supabase-проекта в начале скрипта.";
+      renderCameras(); renderEvents(); return;
+    }
+    $("dataStatus").textContent = "Загружаем данные…";
+    try {
+      const [camRes, eventRes] = await Promise.all([
+        supabase.from("cameras").select("id,name,address,latitude,longitude,source_url,status,is_public").eq("is_public", true),
+        supabase.from("city_events").select("id,title,description,category,importance,source_url,occurred_at").order("occurred_at", {ascending:false}).limit(50)
+      ]);
+      if (camRes.error) throw new Error("Камеры: " + camRes.error.message);
+      if (eventRes.error) throw new Error("События: " + eventRes.error.message);
+      cameras = camRes.data || []; events = eventRes.data || [];
+      renderCameras(); renderEvents();
+      $("dataStatus").textContent = `Обновлено: ${new Date().toLocaleTimeString("ru-RU")}`;
+    } catch (err) {
+      console.error(err);
+      $("dataStatus").textContent = "Не удалось загрузить данные: " + err.message;
+    }
+  }
+
+  $("gpsBtn").addEventListener("click", () => {
+    const status = $("gpsStatus");
+    if (!("geolocation" in navigator)) {
+      status.textContent = "Этот браузер не поддерживает геолокацию."; return;
+    }
+    status.textContent = "Запрашиваем разрешение на геопозицию…";
+    navigator.geolocation.getCurrentPosition(pos => {
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      if (userMarker) map.removeLayer(userMarker);
+      if (userCircle) map.removeLayer(userCircle);
+      userMarker = L.marker([lat, lon]).addTo(map).bindPopup("Твоё устройство").openPopup();
+      userCircle = L.circle([lat, lon], {radius: Math.max(pos.coords.accuracy || 30, 30), color:"#6ea8ff", fillOpacity:.12}).addTo(map);
+      map.setView([lat, lon], 16);
+      status.textContent = `Позиция получена с точностью около ${Math.round(pos.coords.accuracy)} м. Координаты не сохраняются.`;
+    }, err => {
+      const messages = {1:"Доступ запрещён. Разреши геолокацию в настройках браузера.",2:"Местоположение сейчас недоступно.",3:"Истекло время ожидания GPS."};
+      status.textContent = messages[err.code] || "Не удалось получить геопозицию.";
+    }, {enableHighAccuracy:true, timeout:15000, maximumAge:10000});
+  });
+
+  $("resetBtn").addEventListener("click", () => map.setView(KISELYOVSK, 12));
+  $("refreshBtn").addEventListener("click", loadData);
+  document.querySelectorAll("[data-filter]").forEach(btn => btn.addEventListener("click", () => {
+    activeFilter = btn.dataset.filter;
+    document.querySelectorAll("[data-filter]").forEach(b => b.classList.toggle("active", b === btn));
+    renderEvents();
+  }));
+
+  loadData();
+})();
+</script>
+</body>
+</html>
