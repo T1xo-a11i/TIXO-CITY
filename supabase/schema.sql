@@ -10,7 +10,7 @@ create index if not exists city_events_public_time_idx
   on public.city_events (is_public, occurred_at desc);
 
 create or replace function public.tixo_set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger\nlanguage plpgsql\nset search_path = pg_catalog\nas $
 begin
   new.updated_at = now();
   return new;
@@ -27,7 +27,7 @@ create trigger city_events_set_updated_at
 before update on public.city_events
 for each row execute function public.tixo_set_updated_at();
 
-drop policy if exists "Public can read published cameras" on public.cameras;
+drop policy if exists "Public can read listed cameras" on public.cameras;\ndrop policy if exists "Public can read published cameras" on public.cameras;
 create policy "Public can read published cameras"
 on public.cameras for select to anon, authenticated
 using (is_public = true);
@@ -38,7 +38,7 @@ on public.cameras for all to authenticated
 using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
 with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 
-drop policy if exists "Public can read published events" on public.city_events;
+drop policy if exists "Public can read city events" on public.city_events;\ndrop policy if exists "Public can read published events" on public.city_events;
 create policy "Public can read published events"
 on public.city_events for select to anon, authenticated
 using (is_public = true);
