@@ -155,8 +155,14 @@
     root.innerHTML = cameras.map(c => {
       const status = c.status === "online" ? "good" : "warn";
       const source = safeHttpUrl(c.source_url);
-      const link = source ? `<a href="${safeText(source)}" target="_blank" rel="noopener noreferrer">Источник ↗</a>` : "Источник не указан";
-      return `<div class="item"><div class="item-top"><span class="item-title">${safeText(c.name)}</span><span class="tag ${status}">${safeText(c.status || "unknown")}</span></div><div class="hint">${safeText(c.address || "Адрес не указан")} · ${link}</div></div>`;
+      const isGoodline = /goodline|a42/i.test(String(c.name || "")) && source;
+      const link = source ? `<a href="${safeText(source)}" target="_blank" rel="noopener noreferrer">Открыть каталог камер A42 ↗</a>` : "Источник не указан";
+      const appLink = isGoodline ? ' · <a href="https://www.goodline.ru/goodline-gorod" target="_blank" rel="noopener noreferrer">Goodline Город ↗</a>' : "";
+      const label = isGoodline ? "просмотр в приложении" : (c.status || "unknown");
+      const detail = isGoodline
+        ? '<div class="hint">Киселёвск указан среди городов с дорожными камерами. Просмотр доступен через Goodline Город; открытый видеопоток для встраивания на сайт не опубликован.</div>'
+        : "";
+      return `<div class="item"><div class="item-top"><span class="item-title">${safeText(c.name)}</span><span class="tag ${status}">${safeText(label)}</span></div><div class="hint">${safeText(c.address || "Адрес не указан")} · ${link}${appLink}</div>${detail}</div>`;
     }).join("");
     cameras.forEach(c => {
       if (validCoords(c.latitude, c.longitude)) {
